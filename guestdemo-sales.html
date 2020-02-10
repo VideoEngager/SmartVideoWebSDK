@@ -1,0 +1,221 @@
+<html>
+<head>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <link rel="stylesheet" href="guestdemo.css" type="text/css"/>
+    
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    <script src="https://sdk-cdn.mypurecloud.com/javascript-guest/4.1.0/purecloud-guest-chat-client.min.js"></script>
+    <script src="guestdemo.js"></script>
+    <script>
+      $(document).ready(function() {
+    
+        let videoengagerUrl;
+        let url = window.location.href;
+        if(url.indexOf("test-url=5fc9") == -1) {
+          videoengagerUrl = 'https://videome.leadsecure.com/';
+        } else {
+          videoengagerUrl = 'https://test.videoengager.com/';
+        }
+        videoengager.setVideoengagerUrl(videoengagerUrl);
+        
+        // Optional params
+        // Start with camera on or off.
+        // true - ignore SmartVideo setting 'Customer starts the call with camera ON'
+        // false - use SmartVideo setting 'Customer starts the call with camera ON'
+        videoengager.setVideoOn(false);
+        videoengager.setButtonStartLabel('Click2Video');
+        videoengager.setButtonEndLabel('Stop it');
+        videoengager.setVideoIframeHolderName('myVideoHolder');
+        
+        // Callbacks
+        videoengager.afterGenerateInteractionDataCallback(() => {
+          $("#interactionId").val(videoengager.getInteractionId());
+        });
+        videoengager.startButtonPressed(() => {
+          $("#error-holder").hide();
+          videoengager.setDisplayName($("#displayName").val());
+          videoengager.setFirstName($("#firstName").val());
+          videoengager.setLastName($("#lastName").val());
+          
+          videoengager.setQueue($("#queueName").val());
+          videoengager.setOrganizationId($("#organizationId").val());
+          videoengager.setDeploymentId($("#deploymentId").val());
+          videoengager.setEnvironment($("#environment").children("option:selected").val());
+          videoengager.setTenantId($("#tenatId").val());
+        });
+        videoengager.onError((err) => {
+          if(err.code == 'all_input_fields_are_required') {
+            $("#error-holder").attr("class", "alert alert-danger");
+            $("#error-holder").attr("role", "alert");
+            $("#error-holder").html("All input fields are required");
+            $("#error-holder").show();
+          }
+        });
+        
+        // Required 
+        videoengager.init();
+        
+        $("#displayName").val("Customer " + Math.floor(Math.random()*10+1));
+        
+        // Local Storage
+        let advancedSettingsInputs = ['queueName', 'organizationId', 'deploymentId', 'tenatId'];
+        let toShow = false;
+        advancedSettingsInputs.forEach((item) => {
+          let value = localStorage.getItem(`${item}`);
+          if(value) {
+            $(`#${item}`).val(value);
+          } else {
+            toShow = true;
+          }
+        });
+        let environmentValue = localStorage.getItem('environment');
+        if(environmentValue) {
+          $("#environment").val(environmentValue);
+        } else {
+          toShow = true;
+        }
+        
+        $("#save").click(() => {
+          advancedSettingsInputs.forEach((item) => {
+            let value = $(`#${item}`).val();
+            value ? localStorage.setItem(`${item}`, value) : null;
+          });
+          
+          let environmentValue = $("#environment").children("option:selected").val();
+          environmentValue ? localStorage.setItem('environment', environmentValue) : null;
+        });
+        
+        $("#clean").click(() => { 
+          advancedSettingsInputs.forEach((item) => {
+            localStorage.removeItem(`${item}`);
+            $(`#${item}`).val('');
+          });
+          
+          localStorage.removeItem('environment');
+          $("#environment").val($("#environment option:first").val());
+        });
+        
+        $('#collapseSettings').on('hide.bs.collapse', () => {
+          $('#collapseAdvancedSettings').collapse('hide');
+        });
+        
+        if(toShow) {
+          $('#collapseSettings').collapse('show');
+          $('#collapseAdvancedSettings').collapse('show');
+        }
+      });
+    </script>
+</head>
+<body>
+    <div class="container">
+      <div class="row">
+        <div class="col">
+          <h1>SMARTVIDEO CLICK2VIDEO DEMO</h1>
+          <div class="form-group">
+            <label for="displayName">Display Name</label>
+            <input type="text" class="form-control" id="displayName" placeholder="Display Name">
+            <small id="displayName" class="form-text text-muted">Display Name appear in PureCloud "Interactions" section</small>
+          </div>
+          <div class="form-group">
+            <button class="btn btn-secondary btn-sm" type="button" data-toggle="collapse" data-target="#collapseSettings" aria-expanded="false" aria-controls="collapseSettings">
+              More >>
+            </button>
+            <div class="collapse" id="collapseSettings">
+              <div class="card card-body">
+                <div class="form-group">
+                  <label for="interactionId">Interaction Id</label>
+                  <input type="text" readonly class="form-control" id="interactionId" aria-describedby="interactionIdHelp" placeholder="Interaction Id">
+                  <small id="interactionIdHelp" class="form-text text-muted">Interaction Id is unique chat identifier</small>
+                </div>
+                <div class="form-group">
+                  <label for="firstName">First Name</label>
+                  <input type="text" class="form-control" id="firstName" placeholder="First Name" value="First Name" aria-describedby="firstNameHelp">
+                  <small id="firstNameHelp" class="form-text text-muted">First Name is displayed in "Profile" section after "Answer" interaction</small>
+                </div>
+                <div class="form-group">
+                  <label for="lastName">Last Name</label>
+                  <input type="text" class="form-control" id="lastName" placeholder="Last Name" value="Last Name" aria-describedby="lastNameHelp">
+                  <small id="lastNameHelp" class="form-text text-muted">Last Name is displayed in "Profile" section after "Answer" interaction</small>
+                </div>          
+                <div class="form-group">
+                  <button id="advancedSettingsButton" class="btn btn-secondary btn-sm" type="button" aria-describedby="advancedSettingsButtonHelp"
+                    data-toggle="collapse" data-target="#collapseAdvancedSettings" aria-expanded="false" aria-controls="collapseAdvancedSettings">
+                    Advanced >>
+                  </button>
+                  <small id="advancedSettingsButtonHelp" class="form-text text-muted">Advanced settings contains PureCloud and SmartVideo integration credentials</small>
+                </div>
+              </div>
+            </div>
+            <div class="collapse" id="collapseAdvancedSettings">
+              <div class="card card-body">
+                <div class="form-group">
+                  <label for="queueName">Queue Name</label>
+                  <input id="queueName" type="text" class="form-control" placeholder="Queue Name" aria-describedby="queueNameHelp">
+                  <small id="queueNameHelp" class="form-text text-muted">PureCloud agent will receive interaction when is "On Queue" with queue from Queue Name</small>
+                </div>
+                <div class="form-group">
+                  <label for="organizationId">Organization Id</label>
+                  <input id="organizationId" type="text" class="form-control" placeholder="Organization Id" aria-describedby="organizationIdHelp">
+                  <small id="organizationIdHelp" class="form-text text-muted">
+                    To get your Organization Id open PureCloud as admin and navigate to Admin > Account Settings > Organization Settings > Organization Details (tab) > Advanced > Organization ID
+                  </small>
+                </div>
+                <div class="form-group">
+                  <label for="deploymentId">Deployment Id</label>
+                  <input id="deploymentId" type="text" class="form-control" placeholder="Deployment Id" aria-describedby="deploymentIdHelp">
+                  <small id="deploymentIdHelp" class="form-text text-muted">
+                    To get your Deployment Id open PureCloud as admin and navigate to Admin > Contact Center > Widgets > Deployment Key (column)
+                  </small>
+                </div>
+                <div class="form-group">
+                  <label for="environment">Environment</label>
+                  <select id="environment" class="form-control" aria-describedby="environmentHelp">
+                    <option value="mypurecloud.de">EMEA (Frankfurt)</option>
+                    <option value="mypurecloud.com">Americas (US East)</option>
+                    <option value="usw2.pure.cloud">Americas (US West)</option>
+                    <option value="mypurecloud.com.au">Asia Pacific (Sydney)</option>
+                    <option value="mypurecloud.jp">Asia Pacific (Tokyo)</option>
+                    <option value="mypurecloud.ie">EMEA (Dublin)</option>
+                  </select>
+                  <small id="environmentHelp" class="form-text text-muted">Select PureCloud Region</small>
+                </div>
+                <div class="form-group">
+                  <label for="tenatId">Tennat Id</label>
+                  <input id="tenatId" type="text" class="form-control" placeholder="Tennat Id" aria-describedby="tenatIdHelp">
+                  <small id="tenatIdHelp" class="form-text text-muted">
+                    To get your Tennat Id select Apps > SmartVideo_Settings > Tennat Id
+                  </small>
+                </div>
+                <div class="form-group">
+                  <div class="row">
+                    <div class="col">
+                      <button id="save" type="button" class="btn btn-danger btn-sm">Save</button>
+                    </div>
+                    <div class="col">
+                      <button id="clean" type="button" class="btn btn-warning btn-sm float-right">Clean</button>
+                    </div>
+                  </div>
+                  <small class="form-text text-muted">
+                    You can save current Advanced Settings to Local Storage. 
+                    They can be reused from the same browser from the same computer many times. 
+                    To remove them from Local Storage use "Clean" button
+                  </small>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <div id="error-holder" class="alert alert-danger" role="alert" style="display: none;"></div>
+            <button id="clickButton"></button>
+          </div>
+          <div class="form-group">
+            <div id="myVideoHolder" style="width: 100%; height: 600px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+</body>
+</html>

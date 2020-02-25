@@ -5,7 +5,8 @@ let videoengager = (function () {
     videoIframeHolderName = 'video-iframe-holder',
     afterGenerateInteractionDataCallback = null,
     startButtonPressed = null, 
-    onError = null;
+    onError = null,
+    cleanUpVideoHolder = true;
 
     const returnExtendedResponses = false;
     const enableDebugLogging = false;
@@ -321,9 +322,11 @@ let videoengager = (function () {
       }
       $("#clickButton").html(clickButtonStartLabel);
       $("#clickButton").attr("disabled", false);
-      let iframe = document.getElementById("videoengageriframe");
-      if(iframe) iframe.remove();
-      $(`#${videoIframeHolderName}`).html('');
+      if(cleanUpVideoHolder) {
+        let iframe = document.getElementById("videoengageriframe");
+        if(iframe) iframe.remove();
+        $(`#${videoIframeHolderName}`).html('');
+      }
       isStarted = false;
     };
     
@@ -362,6 +365,7 @@ let videoengager = (function () {
       setButtonStartLabel: (inStartLabel) => { clickButtonStartLabel = inStartLabel },
       setButtonEndLabel: (inEndLabel) => { clickButtonStopLabel = inEndLabel },
       setVideoIframeHolderName: (inVideoIframeHolderName) => { videoIframeHolderName = inVideoIframeHolderName},
+      setCleanUpVideoHolder: (inCleanUpVideoHolder) => { cleanUpVideoHolder = inCleanUpVideoHolder },
       getInteractionId: () => interactionId,
       getDisplayName: () => displayName,
       getFirstName: () => firstName,

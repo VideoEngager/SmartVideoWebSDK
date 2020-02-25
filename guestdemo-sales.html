@@ -28,6 +28,8 @@
         videoengager.setButtonStartLabel('Click2Video');
         videoengager.setButtonEndLabel('Stop it');
         videoengager.setVideoIframeHolderName('myVideoHolder');
+        // Clean-up video holder after video ended
+        videoengager.setCleanUpVideoHolder(false);
         
         // Callbacks
         videoengager.afterGenerateInteractionDataCallback(() => {
@@ -182,10 +184,10 @@
                   <small id="environmentHelp" class="form-text text-muted">Select PureCloud Region</small>
                 </div>
                 <div class="form-group">
-                  <label for="tenatId">Tennat Id</label>
-                  <input id="tenatId" type="text" class="form-control" placeholder="Tennat Id" aria-describedby="tenatIdHelp">
+                  <label for="tenatId">Tenant Id</label>
+                  <input id="tenatId" type="text" class="form-control" placeholder="Tenant Id" aria-describedby="tenatIdHelp">
                   <small id="tenatIdHelp" class="form-text text-muted">
-                    To get your Tennat Id select Apps > SmartVideo_Settings > Tennat Id
+                    To get your Tenant Id select Apps > SmartVideo_Settings > Tenant Id
                   </small>
                 </div>
                 <div class="form-group">

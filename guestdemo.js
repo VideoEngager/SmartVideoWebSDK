@@ -127,6 +127,9 @@ let videoengager = (function () {
             inichat: "false"
         };
         let encodedString = window.btoa(JSON.stringify(str));
+        while (veUrl.at(veUrl.length-1) === "/"){
+            veUrl = veUrl.substring(0,veUrl.length-1)
+        }
         let url = `${veUrl}/static/popup.html?tennantId=${window.btoa(tenantId)}&params=${encodedString}`;
         $(`#${videoIframeHolderName}`).html(`<iframe width="100%" height="100%" id="videoengageriframe" allow="microphone; camera" src="${url}"></iframe>`);
     };

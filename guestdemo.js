@@ -8,6 +8,9 @@ let videoengager = (function () {
     onError = null,
     cleanUpVideoHolder = true;
 
+    let KEEP_ALIVE_TIME = 10*60*1000; // keep alive time 10min
+    let keepAliveTimer;
+    
     const returnExtendedResponses = false;
     const enableDebugLogging = false;
     
@@ -18,6 +21,27 @@ let videoengager = (function () {
 
     const platformClient = require("platformClient");
     const client = platformClient.ApiClient.instance;
+
+    /**
+     * a function to send typing notification. it is used to avoid 15min chat timeout 
+     */
+    const sendNotificationTyping = function() {
+        $.ajax({
+            url: `https://api.${environment}/api/v2/webchat/guest/conversations/${chatId}/members/${memberId}/typing`,
+            type: "POST",
+            contentType: "application/json",
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader( "Authorization", "bearer " + jwt );
+            },
+            success: function(data, statusCode, jqXHR) {
+                console.log("successfully sent typing indicator");
+            },
+            error: function(err) {
+                console.error(err.responseText);
+            }
+        });
+    }
+    
 
     /**
      * Configures purecloud's sdk (enables debugging, sets correct environment)
@@ -167,6 +191,9 @@ let videoengager = (function () {
                 console.log("error", err);
             }
         });
+
+        // schedule a typing indicator each 10min to keep chat channel opened
+        keepAliveTimer = setInterval(sendNotificationTyping, KEEP_ALIVE_TIME); 
     };
 
     /**
@@ -320,6 +347,9 @@ let videoengager = (function () {
     };
     
     const endVideo = function(isConversationDeleted = false) {
+      if(keepAliveTimer){
+          clearInterval(keepAliveTimer);
+      }
       if(!isConversationDeleted) {
         deleteConversation();
       }

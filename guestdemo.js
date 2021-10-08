@@ -257,10 +257,13 @@ let videoengager = (function () {
                         onConnected();
                     } else if (message.eventBody && message.eventBody.member && message.eventBody.member.state == 'CONNECTED') {
                         connectedMembersId.push(message.eventBody.member.id);
-                    } else if (message.eventBody && message.eventBody.member && message.eventBody.member.state == 'DISCONNECTED'
-                      && connectedMembersId.length >= 2 && connectedMembersId[1] == message.eventBody.member.id) {
-                        endVideo(true);
-                        connectedMembersId = [];
+                    } else if ( message.eventBody && message.eventBody.member && message.eventBody.member.state == 'DISCONNECTED' ) {
+                        if (message.eventBody.member.id === memberId) {
+                            endVideo(true);
+                            connectedMembersId = [];
+                        } else {
+                            if(isStarted){ onConnected() }
+                        }
                     } else if (message.eventBody && message.eventBody.member.id === memberId && message.eventBody.member.state == 'DISCONNECTED') {
                       connectedMembersId = [];
                     }

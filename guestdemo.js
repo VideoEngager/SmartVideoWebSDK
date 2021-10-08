@@ -10,7 +10,6 @@ let videoengager = (function () {
 
     let KEEP_ALIVE_TIME = 10*60*1000; // keep alive time 10min
     let keepAliveTimer;
-    
     const returnExtendedResponses = false;
     const enableDebugLogging = false;
     
@@ -41,7 +40,6 @@ let videoengager = (function () {
             }
         });
     }
-    
 
     /**
      * Configures purecloud's sdk (enables debugging, sets correct environment)
@@ -191,7 +189,6 @@ let videoengager = (function () {
                 console.log("error", err);
             }
         });
-
         // schedule a typing indicator each 10min to keep chat channel opened
         keepAliveTimer = setInterval(sendNotificationTyping, KEEP_ALIVE_TIME); 
     };
@@ -347,9 +344,7 @@ let videoengager = (function () {
     };
     
     const endVideo = function(isConversationDeleted = false) {
-      if(keepAliveTimer){
-          clearInterval(keepAliveTimer);
-      }
+      if(keepAliveTimer){ clearInterval(keepAliveTimer) }
       if(!isConversationDeleted) {
         deleteConversation();
       }

@@ -146,6 +146,7 @@ let videoengager = (function () {
             view_widget: "4",
             offline: true,
             aa: true,
+            skip_private: true,
             inichat: "false"
         };
         let encodedString = window.btoa(JSON.stringify(str));

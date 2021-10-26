@@ -262,8 +262,6 @@ let videoengager = (function () {
                         if (message.eventBody.member.id === memberId) {
                             endVideo(true);
                             connectedMembersId = [];
-                        } else {
-                            if(isStarted){ onConnected() }
                         }
                     } else if (message.eventBody && message.eventBody.member.id === memberId && message.eventBody.member.state == 'DISCONNECTED') {
                       connectedMembersId = [];

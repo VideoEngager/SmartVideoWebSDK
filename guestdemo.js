@@ -244,32 +244,74 @@ let videoengager = (function () {
      * Callback executed when socked receives message
      * @param event socket event param
      */
-    const onReceivedMessageEventFromSocket = function (event) {
+     const onReceivedMessageEventFromSocket = function(event) {
         console.log("onReceivedMessageEventFromSocket started", event);
-        const message = JSON.parse(event.data);
-        if (message.metadata) {
-            switch (message.metadata.type) {
-                case 'message': {
-                    // onReceivedMessageFromConversation(message);
-                    break;
-                }
-                case 'member-change': {
-                    if (message.eventBody && message.eventBody.member.id === memberId && message.eventBody.member.state == 'CONNECTED') {
+        const message = event && event.data ? JSON.parse(event.data) : null;
+        let eventMemberId, eventType, eventMemberState;
+        // memberId -> customer's member id
+
+        // get event member id 
+        if (message && message.eventBody && message.eventBody.member && message.eventBody.member.id ){
+            eventMemberId = message.eventBody.member.id;
+        }
+
+        // get event type
+        if (message && message.metadata && message.metadata.type) {
+            eventType = message.metadata.type;
+        }
+
+        // get event member state
+        if (message && message.eventBody && message.eventBody.member && message.eventBody.member.state) {
+            eventMemberState = message.eventBody.member.state;
+        }
+
+        if (eventType == 'message') {
+            // onReceivedMessageFromConversation(message);
+        }
+
+        // if participant state is changed
+        if (eventType == 'member-change') {
+            // there are 3 states, CONNECTED, DISCONNECTED, ALERTING
+            switch (eventMemberState) {
+                // participant connected
+                case 'CONNECTED': {
+                    // use our iframe to notify the customer that genesys connection established 
+                    // you can use a custom notification here. 
+                    // if this call drop into an agent, iframe will be reinitialized
+                    if (eventMemberId === memberId){
                         onConnected();
-                    } else if (message.eventBody && message.eventBody.member && message.eventBody.member.state == 'CONNECTED') {
-                        connectedMembersId.push(message.eventBody.member.id);
-                    } else if ( message.eventBody && message.eventBody.member && message.eventBody.member.state == 'DISCONNECTED' ) {
-                        if (message.eventBody.member.id === memberId) {
-                            endVideo(true);
-                            connectedMembersId = [];
-                        } else {
-                            if(isStarted){ onConnected() }
-                        }
-                    } else if (message.eventBody && message.eventBody.member.id === memberId && message.eventBody.member.state == 'DISCONNECTED') {
-                      connectedMembersId = [];
+                    }
+                    // add connected participant to members array
+                    if (connectedMembersId.indexOf(eventMemberId) === -1) {
+                        connectedMembersId.push(eventMemberId);
                     }
                     break;
                 }
+                // participant disconnected
+                case 'DISCONNECTED': {
+                    // if customer disconnected from genesys, do cleanup, notify the customer
+                    if (eventMemberId === memberId) {
+                        endVideo(true);
+                    }
+                    // remove disconnected participant from members array
+                    for( var i = 0; i < connectedMembersId.length; i++){ 
+                        if ( connectedMembersId[i] === eventMemberId) { 
+                            connectedMembersId.splice(i, 1); 
+                            break;
+                        }
+                    }
+                    break;
+                }
+                // participant alerting on genesys page for a new agent
+                case 'ALERTING': {
+                    // this part triggered on 3 cases
+                    // 1 - when you make a call and drop to an agent page first time
+                    // 2 - if your agent declined you and another agent accepted you 
+                    // 3 - if your agent transferred you
+                    // new agent requires iframe reinitialization
+                    onConnected() 
+                    break;
+                }  
             }
         }
     };

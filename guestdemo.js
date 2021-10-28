@@ -6,7 +6,7 @@ let videoengager = (function () {
     afterGenerateInteractionDataCallback = null,
     startButtonPressed = null, 
     onError = null,
-    cleanUpVideoHolder = true, connectedMembersId = [];
+    cleanUpVideoHolder = true, connectedMembersId = [], socket;
 
     let KEEP_ALIVE_TIME = 10*60*1000; // keep alive time 10min
     let keepAliveTimer;
@@ -14,7 +14,7 @@ let videoengager = (function () {
     const enableDebugLogging = false;
     
     let chatId;
-    let customerId;
+    let customerMemberId;
     let jwt;
     let interactionId;
 
@@ -26,7 +26,7 @@ let videoengager = (function () {
      */
     const sendNotificationTyping = function() {
         $.ajax({
-            url: `https://api.${environment}/api/v2/webchat/guest/conversations/${chatId}/members/${customerId}/typing`,
+            url: `https://api.${environment}/api/v2/webchat/guest/conversations/${chatId}/members/${customerMemberId}/typing`,
             type: "POST",
             contentType: "application/json",
             beforeSend: function(xhr) {
@@ -160,17 +160,17 @@ let videoengager = (function () {
     /**
      * Sends interaction id
      * @param chatId
-     * @param customerId
+     * @param customerMemberId
      * @param interactionId
      */
-    const sendInteractionId = function (chatId, customerId) {
+    const sendInteractionId = function (chatId, customerMemberId) {
         var postData = {
             body: `{"interactionId": "${interactionId}", "displayName": "${displayName}", "firstName": "${firstName}", "lastName": "${lastName}"}`
         };
 
         $.ajax({
             url:
-                `https://api.${environment}/api/v2/webchat/guest/conversations/${chatId}/members/${customerId}/messages`,
+                `https://api.${environment}/api/v2/webchat/guest/conversations/${chatId}/members/${customerMemberId}/messages`,
             type: "POST",
             data: JSON.stringify(postData),
             contentType: "application/json",
@@ -220,7 +220,7 @@ let videoengager = (function () {
     const onConnected = function () {
         $("#clickButton").html(clickButtonStopLabel);
         $("#clickButton").attr("disabled", false);
-        sendInteractionId(chatId, customerId);
+        sendInteractionId(chatId, customerMemberId);
         loadUI(veUrl, tenantId);
     };
 
@@ -328,33 +328,14 @@ let videoengager = (function () {
      * can be overriden as a callback 
      */
     var onParticipantConnected = function(eventMemberId) {
-        // add connected participant to members array
-        if (connectedMembersId.indexOf(eventMemberId) === -1) {
-            connectedMembersId.push(eventMemberId);
-        }
 
-        // customer connected to genesys
-        if (eventMemberId === customerId){
-            onCustomerConnected();
-        }
     }
 
     /**
      * can be overriden as a callback 
      */
     var onParticipantDisconnected = function(eventMemberId) {
-        // remove disconnected participant from members array
-        for( var i = 0; i < connectedMembersId.length; i++){ 
-            if ( connectedMembersId[i] === eventMemberId) { 
-                connectedMembersId.splice(i, 1); 
-                break;
-            }
-        }
 
-        // if customer disconnected from genesys
-        if (eventMemberId === customerId) {
-            onCustomerDisconnected && onCustomerDisconnected();
-        }
     }
 
     /**  
@@ -373,11 +354,34 @@ let videoengager = (function () {
         switch (eventMemberState) {
             // participant connected
             case 'CONNECTED': {
+                // add connected participant to members array
+                if (connectedMembersId.indexOf(eventMemberId) === -1) {
+                    connectedMembersId.push(eventMemberId);
+                }
+                
+                // customer connected to genesys
+                if (eventMemberId === customerMemberId){
+                    onCustomerConnected();
+                }
+
                 onParticipantConnected && onParticipantConnected(eventMemberId);
                 break;
             }
             // participant disconnected
             case 'DISCONNECTED': {
+                // remove disconnected participant from members array
+                for( var i = 0; i < connectedMembersId.length; i++){ 
+                    if ( connectedMembersId[i] === eventMemberId) { 
+                        connectedMembersId.splice(i, 1); 
+                        break;
+                    }
+                }
+
+                // if customer disconnected from genesys
+                if (eventMemberId === customerMemberId) {
+                    onCustomerDisconnected && onCustomerDisconnected();
+                }
+
                 onParticipantDisconnected && onParticipantDisconnected(eventMemberId);
                 break;
             }
@@ -504,10 +508,10 @@ let videoengager = (function () {
 
                 client.setJwt(chatInfo.jwt);
 
-                let socket = new WebSocket(chatInfo.eventStreamUri);
+                socket = new WebSocket(chatInfo.eventStreamUri);
 
                 chatId = chatInfo.id;
-                customerId = chatInfo.member.id;
+                customerMemberId = chatInfo.member.id;
                 jwt = chatInfo.jwt;
 
                 // Listen for messages
@@ -518,9 +522,9 @@ let videoengager = (function () {
     };
     
     const deleteConversation = function() {
-      if(environment && chatId && customerId) {
+      if(environment && chatId && customerMemberId) {
         $.ajax({
-          url: `https://api.${environment}/api/v2/webchat/guest/conversations/${chatId}/members/${customerId}`,
+          url: `https://api.${environment}/api/v2/webchat/guest/conversations/${chatId}/members/${customerMemberId}`,
           type: "DELETE",
           beforeSend: function(xhr) {
                   xhr.setRequestHeader(
@@ -545,6 +549,7 @@ let videoengager = (function () {
         $(`#${videoIframeHolderName}`).html('');
       }
       isStarted = false;
+      if (socket) {socket.close()}  
     };
     
     let isStarted = false;
@@ -582,7 +587,9 @@ let videoengager = (function () {
       onCustomerDisconnected: (cb) => { onCustomerDisconnected = cb },
       onCallingNewAgent: (cb) => { onCallingNewAgent = cb },
       endCall: () => { endVideo(); },
-      reinitiateVideo: () => { onConnected(); },
+      reinitiateCall: () => { onConnected(); },
+      getCustomerMemberId: () => customerMemberId,
+      getConnectedMembersId: () => connectedMembersId,
 
       setDisplayName: (inDisplayName) => { displayName = inDisplayName },
       setFirstName: (inFirstName) => { firstName = inFirstName },

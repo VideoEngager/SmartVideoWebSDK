@@ -6,7 +6,7 @@ let videoengager = (function () {
     afterGenerateInteractionDataCallback = null,
     startButtonPressed = null, 
     onError = null,
-    cleanUpVideoHolder = true;
+    cleanUpVideoHolder = true, connectedMembersId = [];
 
     let KEEP_ALIVE_TIME = 10*60*1000; // keep alive time 10min
     let keepAliveTimer;
@@ -14,7 +14,7 @@ let videoengager = (function () {
     const enableDebugLogging = false;
     
     let chatId;
-    let memberId;
+    let customerId;
     let jwt;
     let interactionId;
 
@@ -26,7 +26,7 @@ let videoengager = (function () {
      */
     const sendNotificationTyping = function() {
         $.ajax({
-            url: `https://api.${environment}/api/v2/webchat/guest/conversations/${chatId}/members/${memberId}/typing`,
+            url: `https://api.${environment}/api/v2/webchat/guest/conversations/${chatId}/members/${customerId}/typing`,
             type: "POST",
             contentType: "application/json",
             beforeSend: function(xhr) {
@@ -160,17 +160,17 @@ let videoengager = (function () {
     /**
      * Sends interaction id
      * @param chatId
-     * @param memberId
+     * @param customerId
      * @param interactionId
      */
-    const sendInteractionId = function (chatId, memberId) {
+    const sendInteractionId = function (chatId, customerId) {
         var postData = {
             body: `{"interactionId": "${interactionId}", "displayName": "${displayName}", "firstName": "${firstName}", "lastName": "${lastName}"}`
         };
 
         $.ajax({
             url:
-                `https://api.${environment}/api/v2/webchat/guest/conversations/${chatId}/members/${memberId}/messages`,
+                `https://api.${environment}/api/v2/webchat/guest/conversations/${chatId}/members/${customerId}/messages`,
             type: "POST",
             data: JSON.stringify(postData),
             contentType: "application/json",
@@ -220,7 +220,7 @@ let videoengager = (function () {
     const onConnected = function () {
         $("#clickButton").html(clickButtonStopLabel);
         $("#clickButton").attr("disabled", false);
-        sendInteractionId(chatId, memberId);
+        sendInteractionId(chatId, customerId);
         loadUI(veUrl, tenantId);
     };
 
@@ -239,80 +239,223 @@ let videoengager = (function () {
         }
     };
 
-    let connectedMembersId = [];
+    /**
+     * can be overriden as a callback 
+     * @param {chat message sender member id} senderId 
+     * @param {chat message text} messageText 
+     */
+    var onChatMessageReceived = function(senderId, messageText) {
+        
+    }
+
+    /**
+     * can be overriden as a callback 
+     * @param {chat message sender member id} senderId 
+     * @param {chat message text} messageText  
+     */
+    var onChatNoticeReceived = function(senderId, messageText) {
+
+    }
+
+    /**
+     * can be overriden as a callback 
+     * @param {chat message sender member id} senderId 
+     */
+    var onChatMemberJoined = function(senderId) {
+
+    }
+
+    /**
+     * can be overriden as a callback 
+     * @param {chat message sender member id} senderId 
+     */
+    var onChatMemberLeft = function(senderId) {
+
+    }
+
+    var onMessageReceived = function(messageType, senderId, messageText) {
+        switch(messageType) {
+            case 'standard' : {
+                onChatMessageReceived && onChatMessageReceived(senderId, messageText);
+                break;
+            }
+            case 'notice' : {
+                onChatNoticeReceived && onChatNoticeReceived(senderId, messageText);
+                break;
+            }           
+            case 'member-join' : {
+                onChatMemberJoined && onChatMemberJoined(senderId);
+                break;
+            }
+            case 'member-leave' : {
+                onChatMemberLeft && onChatMemberLeft(senderId);
+                break;
+            }
+        }
+    }
+
+    /**
+     * can be overriden as a callback 
+     * @param {chat message typer member id} senderId 
+     */
+    var onTypingReceived = function(senderId) {
+
+    }
+
+    /**
+     * can be overriden as a callback 
+     */
+    var onHeartbeatReceived = function() {
+
+    }
+
+    /**
+     * can be overriden as a callback 
+     */
+    var onCustomerConnected = function(){
+        onConnected();
+    }
+
+    /**
+     * can be overriden as a callback 
+     */
+    var onCustomerDisconnected = function(){
+        // do cleanup
+        endVideo(true);
+    }
+
+    /**
+     * can be overriden as a callback 
+     */
+    var onParticipantConnected = function(eventMemberId) {
+        // add connected participant to members array
+        if (connectedMembersId.indexOf(eventMemberId) === -1) {
+            connectedMembersId.push(eventMemberId);
+        }
+
+        // customer connected to genesys
+        if (eventMemberId === customerId){
+            onCustomerConnected();
+        }
+    }
+
+    /**
+     * can be overriden as a callback 
+     */
+    var onParticipantDisconnected = function(eventMemberId) {
+        // remove disconnected participant from members array
+        for( var i = 0; i < connectedMembersId.length; i++){ 
+            if ( connectedMembersId[i] === eventMemberId) { 
+                connectedMembersId.splice(i, 1); 
+                break;
+            }
+        }
+
+        // if customer disconnected from genesys
+        if (eventMemberId === customerId) {
+            onCustomerDisconnected && onCustomerDisconnected();
+        }
+    }
+
+    /**  
+     * this part triggered on 3 cases
+     * 1 - when you make a call and drop to an agent page first time
+     * 2 - if your agent declined you and another agent accepted you 
+     * 3 - if your agent transferred you
+     * new agent requires reinitialization
+    */
+    var onCallingNewAgent = function(eventMemberId) {
+        onConnected() 
+    }
+
+    var onStateChange = function(eventMemberState, eventMemberId) {
+        // there are 3 states, CONNECTED, DISCONNECTED, ALERTING
+        switch (eventMemberState) {
+            // participant connected
+            case 'CONNECTED': {
+                onParticipantConnected && onParticipantConnected(eventMemberId);
+                break;
+            }
+            // participant disconnected
+            case 'DISCONNECTED': {
+                onParticipantDisconnected && onParticipantDisconnected(eventMemberId);
+                break;
+            }
+            // customer call dropped into a genesys agent queue
+            case 'ALERTING': {
+                onCallingNewAgent && onCallingNewAgent(eventMemberId)
+                break;
+            }  
+        }
+    }
+
     /**
      * Callback executed when socked receives message
      * @param event socket event param
      */
      const onReceivedMessageEventFromSocket = function(event) {
         console.log("onReceivedMessageEventFromSocket started", event);
-        const message = event && event.data ? JSON.parse(event.data) : null;
-        let eventMemberId, eventType, eventMemberState;
-        // memberId -> customer's member id
+        let message, eventMemberId, eventType, eventMemberState, messageType, senderId, messageText;
 
-        // get event member id 
-        if (message && message.eventBody && message.eventBody.member && message.eventBody.member.id ){
-            eventMemberId = message.eventBody.member.id;
+        // parse received socket message into json data
+        try {
+            message = event && event.data ? JSON.parse(event.data) : null;
+        } catch(error) {
+            console.error(error);
         }
-
-        // get event type
-        if (message && message.metadata && message.metadata.type) {
-            eventType = message.metadata.type;
-        }
-
-        // get event member state
-        if (message && message.eventBody && message.eventBody.member && message.eventBody.member.state) {
-            eventMemberState = message.eventBody.member.state;
-        }
-
-        if (eventType == 'message') {
-            // onReceivedMessageFromConversation(message);
-        }
-
-        // if participant state is changed
-        if (eventType == 'member-change') {
-            // there are 3 states, CONNECTED, DISCONNECTED, ALERTING
-            switch (eventMemberState) {
-                // participant connected
-                case 'CONNECTED': {
-                    // use our iframe to notify the customer that genesys connection established 
-                    // you can use a custom notification here. 
-                    // if this call drop into an agent, iframe will be reinitialized
-                    if (eventMemberId === memberId){
-                        onConnected();
-                    }
-                    // add connected participant to members array
-                    if (connectedMembersId.indexOf(eventMemberId) === -1) {
-                        connectedMembersId.push(eventMemberId);
-                    }
-                    break;
-                }
-                // participant disconnected
-                case 'DISCONNECTED': {
-                    // if customer disconnected from genesys, do cleanup, notify the customer
-                    if (eventMemberId === memberId) {
-                        endVideo(true);
-                    }
-                    // remove disconnected participant from members array
-                    for( var i = 0; i < connectedMembersId.length; i++){ 
-                        if ( connectedMembersId[i] === eventMemberId) { 
-                            connectedMembersId.splice(i, 1); 
-                            break;
-                        }
-                    }
-                    break;
-                }
-                // participant alerting on genesys page for a new agent
-                case 'ALERTING': {
-                    // this part triggered on 3 cases
-                    // 1 - when you make a call and drop to an agent page first time
-                    // 2 - if your agent declined you and another agent accepted you 
-                    // 3 - if your agent transferred you
-                    // new agent requires iframe reinitialization
-                    onConnected() 
-                    break;
-                }  
+        
+        // get required data with safety checks
+        if (message && message.eventBody){
+            if (message.eventBody.member) {
+                // get event member id 
+                eventMemberId = message.eventBody.member.id;
+                // get event member state
+                eventMemberState = message.eventBody.member.state;
             }
+
+            // get sender id if exist
+            if (message.eventBody.sender) {
+                senderId = message.eventBody.sender.id;
+            }
+            
+            // get event type, message or 
+            if (message.metadata && message.metadata.type) {
+                eventType = message.metadata.type;
+            }
+
+            // check if event type is a heartbeat
+            if (message.eventBody.message == 'WebSocket Heartbeat') {
+                eventType = 'heartbeat';
+            }
+
+            // get message type if exist
+            messageType = message.eventBody.bodyType;
+            messageText = message.eventBody.body;
+        }
+
+        // process socket message according event type
+        switch(eventType) {
+            // chat message event
+            case 'message': {
+                onMessageReceived && onMessageReceived(messageType, senderId, messageText);
+                break;
+            }
+            // typing notification
+            case 'typing-indicator': {
+                onTypingReceived && onTypingReceived(senderId);
+                break;
+            }
+            // connection alive indicator
+            case 'heartbeat': {
+                onHeartbeatReceived && onHeartbeatReceived();
+                break;
+            }
+            // if participant state is changed
+            case 'member-change': {
+                onStateChange(eventMemberState, eventMemberId);
+                break;
+            }
+         
         }
     };
 
@@ -364,7 +507,7 @@ let videoengager = (function () {
                 let socket = new WebSocket(chatInfo.eventStreamUri);
 
                 chatId = chatInfo.id;
-                memberId = chatInfo.member.id;
+                customerId = chatInfo.member.id;
                 jwt = chatInfo.jwt;
 
                 // Listen for messages
@@ -375,9 +518,9 @@ let videoengager = (function () {
     };
     
     const deleteConversation = function() {
-      if(environment && chatId && memberId) {
+      if(environment && chatId && customerId) {
         $.ajax({
-          url: `https://api.${environment}/api/v2/webchat/guest/conversations/${chatId}/members/${memberId}`,
+          url: `https://api.${environment}/api/v2/webchat/guest/conversations/${chatId}/members/${customerId}`,
           type: "DELETE",
           beforeSend: function(xhr) {
                   xhr.setRequestHeader(
@@ -424,7 +567,23 @@ let videoengager = (function () {
         window.onbeforeunload = () => endVideo();
     });
     
+    
     return {
+      onChatMessageReceived: (cb) => { onChatMessageReceived = cb },
+      onChatNoticeReceived: (cb) => { onChatNoticeReceived = cb },
+      onChatMemberJoined: (cb) => { onChatMemberJoined = cb },
+      onChatMemberLeft: (cb) => { onChatMemberLeft = cb },
+      onMessageReceived: (cb) => { onMessageReceived = cb },
+      onTypingReceived: (cb) => { onTypingReceived = cb },
+      onHeartbeatReceived: (cb) => { onHeartbeatReceived = cb },
+      onParticipantConnected: (cb) => { onParticipantConnected = cb },
+      onParticipantDisconnected: (cb) => { onParticipantDisconnected = cb },
+      onCustomerConnected: (cb) => { onCustomerConnected = cb },
+      onCustomerDisconnected: (cb) => { onCustomerDisconnected = cb },
+      onCallingNewAgent: (cb) => { onCallingNewAgent = cb },
+      endCall: () => { endVideo(); },
+      reinitiateVideo: () => { onConnected(); },
+
       setDisplayName: (inDisplayName) => { displayName = inDisplayName },
       setFirstName: (inFirstName) => { firstName = inFirstName },
       setLastName: (inLastName) => { lastName = inLastName },
